@@ -13,9 +13,9 @@ spring:
     name: storage-box
 
   datasource:
-    url: ${DB_URL:jdbc:mysql://localhost:3306/storage}
+    url: ${DB_URL:mysql://root:krXfJoQNRijrxHRxPlicrnzdTPvSYUQn@mysql.railway.internal:3306/railway}
     username: ${DB_USER:root}
-    password: ${DB_PW:}
+    password: ${DB_PW:krXfJoQNRijrxHRxPlicrnzdTPvSYUQn}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   jpa:
