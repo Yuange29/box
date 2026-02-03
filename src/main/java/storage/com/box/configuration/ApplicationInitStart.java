@@ -32,9 +32,13 @@ public class ApplicationInitStart {
 
             if (!userRepository.existsByUserName("#admin")) {
 
+                Role roleAdmin = roleRepository.findById("ADMIN")
+                        .orElseGet(() -> roleRepository.save(
+                                Role.builder().name("ADMIN").permissions(null).build()
+                        ));
+
                 var roles = new HashSet<Role>();
-                roles.add(Role.builder().name("ADMIN").permissions(new HashSet<>())
-                        .build());
+                roles.add(roleAdmin);
 
                 User user = User.builder()
                         .userName("#admin")
