@@ -1,0 +1,30 @@
+jwt:
+  secret: ${SECRET_KEY:2f110de42cca5b47590a3c407abfa7fed1625e21153ac10ab7a860c40c8cd34e}
+  access-token-expiration: ${ACC_EXP:3600}
+  refresh-token-expiration: ${REF_EXP:360000}
+
+server:
+  port: 8080
+  servlet:
+    context-path: /storage
+
+spring:
+  application:
+    name: storage-box
+
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/storage}
+    username: ${DB_USER:root}
+    password: ${DB_PW:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
