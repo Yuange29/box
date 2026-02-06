@@ -138,23 +138,30 @@ public class AuthenticationService {
     public SignedJWT verifyToken(String token, boolean isRefreshToken)
             throws JOSEException, ParseException {
 
-        JWSVerifier verifier = new MACVerifier(SIGNER_KEY.getBytes());
-
         SignedJWT jwt = SignedJWT.parse(token);
 
-        Date date = (isRefreshToken)
+        if (!jwt.getHeader().getAlgorithm().equals(JWSAlgorithm.HS256)) {
+            throw new AppException(ErrorCode.AUTHENTICATION_FAIL);
+        }
+
+        JWSVerifier verifier = new MACVerifier(SIGNER_KEY.getBytes());
+        if (!jwt.verify(verifier)) {
+            throw new AppException(ErrorCode.AUTHENTICATION_FAIL);
+        }
+
+        Date expiration = isRefreshToken
                 ? new Date(jwt.getJWTClaimsSet().getIssueTime()
-                    .toInstant().plus(REFRESH_TOKEN_EXPIRATION_TIME, ChronoUnit.SECONDS)
-                    .toEpochMilli())
+                .toInstant().plus(REFRESH_TOKEN_EXPIRATION_TIME, ChronoUnit.SECONDS)
+                .toEpochMilli())
                 : jwt.getJWTClaimsSet().getExpirationTime();
 
-        var verified = jwt.verify(verifier);
-
-        if (!verified && date.after(new Date()))
+        if (expiration.before(new Date())) {
             throw new AppException(ErrorCode.AUTHENTICATION_FAIL);
+        }
 
-        if (invalidTokenRepository.existsById(jwt.getJWTClaimsSet().getJWTID()))
+        if (invalidTokenRepository.existsById(jwt.getJWTClaimsSet().getJWTID())) {
             throw new AppException(ErrorCode.AUTHENTICATION_FAIL);
+        }
 
         return jwt;
     }
@@ -164,7 +171,8 @@ public class AuthenticationService {
 
         JWTClaimsSet claimsSet = new  JWTClaimsSet.Builder()
                 .subject(user.getUserName())
-                .issuer("http://locahost:8080/storage")
+//                .issuer("http://localhost:8080/storage")
+                .issuer("storage-service")
                 .issueTime(new Date())
                 .expirationTime(new Date(
                         Instant.now().plus(ASSERTION_EXPIRATION_TIME, ChronoUnit.SECONDS).toEpochMilli()
