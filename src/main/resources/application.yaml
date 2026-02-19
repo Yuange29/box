@@ -1,7 +1,7 @@
 jwt:
   secret: ${SECRET_KEY:2f110de42cca5b47590a3c407abfa7fed1625e21153ac10ab7a860c40c8cd34e}
-  access-token-expiration: ${ACC_EXP:3600}
-  refresh-token-expiration: ${REF_EXP:360000}
+  access-token-expiration: ${ACC_EXP:900}
+  refresh-token-expiration: ${REF_EXP:259200}
 
 server:
   port: 8080

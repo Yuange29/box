@@ -10,7 +10,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
@@ -30,7 +29,9 @@ import storage.com.box.repository.UserRepository;
 import java.text.ParseException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.*;
+import java.util.Date;
+import java.util.StringJoiner;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -39,6 +40,7 @@ import java.util.*;
 @Slf4j
 public class AuthenticationService {
 
+    final PasswordEncoder passwordEncoder;
     final UserRepository userRepository;
     final InvalidTokenRepository invalidTokenRepository;
 
@@ -54,8 +56,6 @@ public class AuthenticationService {
     public AuthenticationResponse authenticate(AuthenticationRequest request)
             throws AppException {
 
-        PasswordEncoder passwordEncoder = new BCryptPasswordEncoder(10);
-
         User user = userRepository.findByUserName(request.getUserName())
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXIST));
 
@@ -65,11 +65,13 @@ public class AuthenticationService {
         if (!authenticated)
             throw new AppException(ErrorCode.AUTHENTICATION_FAIL);
 
-        String token = generateToken(user);
+        String accessToken = generateToken(user, false);
+        String refreshToken = generateToken(user, true);
 
         return AuthenticationResponse.builder()
                 .status("success")
-                .token(token)
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
                 .build();
     }
 
@@ -81,7 +83,7 @@ public class AuthenticationService {
         boolean isValid = true;
 
         try {
-            verifyToken(token, false);
+            verifyToken(token, "access");
         } catch (ParseException e) {
             isValid =  false;
         }
@@ -93,11 +95,12 @@ public class AuthenticationService {
     public AuthenticationResponse refreshToken(RefreshTokenRequest request)
             throws ParseException, JOSEException {
 
-        var signJwt = verifyToken(request.getToken(), true);
+        // Kiểm tra phải là refresh token
+        SignedJWT signedJWT = verifyToken(request.getToken(), "refresh");
 
-        String jwtId = signJwt.getJWTClaimsSet().getJWTID();
-
-        Date exp = signJwt.getJWTClaimsSet().getExpirationTime();
+        // Blacklist refresh token cũ
+        String jwtId = signedJWT.getJWTClaimsSet().getJWTID();
+        Date exp = signedJWT.getJWTClaimsSet().getExpirationTime();
 
         InvalidToken invalidToken = InvalidToken.builder()
                 .id(jwtId)
@@ -106,56 +109,67 @@ public class AuthenticationService {
 
         invalidTokenRepository.save(invalidToken);
 
-        var name = signJwt.getJWTClaimsSet().getSubject();
+        // Lấy thông tin user
+        String userName = signedJWT.getJWTClaimsSet().getSubject();
+        User user = userRepository.findByUserName(userName)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXIST));
 
-        var user = userRepository.findByUserName(name).orElseThrow(() ->
-                new AppException(ErrorCode.USER_NOT_EXIST));
-
-        var token = generateToken(user);
+        // Generate cả 2 token mới — token rotation
+        String newAccessToken = generateToken(user, false);
+        String newRefreshToken = generateToken(user, true);
 
         return AuthenticationResponse.builder()
                 .status("success")
-                .token(token)
+                .accessToken(newAccessToken)
+                .refreshToken(newRefreshToken)
                 .build();
     }
 
     public void logout(IntrospectRequest request)
             throws ParseException, JOSEException {
-        var signJwt = verifyToken(request.getToken(), false);
+        try {
+            var signJwt = verifyToken(request.getToken(), "access");
 
-        var jwtId = signJwt.getJWTClaimsSet().getJWTID();
+            InvalidToken invalidToken = InvalidToken.builder()
+                    .id(signJwt.getJWTClaimsSet().getJWTID())
+                    .exp(signJwt.getJWTClaimsSet().getExpirationTime())
+                    .build();
 
-        var exp = signJwt.getJWTClaimsSet().getExpirationTime();
+            invalidTokenRepository.save(invalidToken);
 
-        InvalidToken invalidToken = InvalidToken.builder()
-                .id(jwtId)
-                .exp(exp)
-                .build();
-
-        invalidTokenRepository.save(invalidToken);
+        } catch (AppException e) {
+            // Token hết hạn hoặc không hợp lệ → coi như đã logout thành công
+        }
     }
 
-    public SignedJWT verifyToken(String token, boolean isRefreshToken)
+    public SignedJWT verifyToken(String token, String expectedTokenType)
             throws JOSEException, ParseException {
 
         SignedJWT jwt = SignedJWT.parse(token);
 
+        // Check algorithm
         if (!jwt.getHeader().getAlgorithm().equals(JWSAlgorithm.HS256)) {
             throw new AppException(ErrorCode.AUTHENTICATION_FAIL);
         }
 
+        // Check chữ ký
         JWSVerifier verifier = new MACVerifier(SIGNER_KEY.getBytes());
         if (!jwt.verify(verifier)) {
             throw new AppException(ErrorCode.AUTHENTICATION_FAIL);
         }
 
-        Date expiration = isRefreshToken
-                ? new Date(jwt.getJWTClaimsSet().getIssueTime()
-                .toInstant().plus(REFRESH_TOKEN_EXPIRATION_TIME, ChronoUnit.SECONDS)
-                .toEpochMilli())
-                : jwt.getJWTClaimsSet().getExpirationTime();
+        // Check issuer
+        if (!"storage-service".equals(jwt.getJWTClaimsSet().getIssuer())) {
+            throw new AppException(ErrorCode.AUTHENTICATION_FAIL);
+        }
 
-        if (expiration.before(new Date())) {
+        // Check token_type — "access" or "refresh"
+        String tokenType = jwt.getJWTClaimsSet().getStringClaim("token_type");
+        if (!expectedTokenType.equals(tokenType)) {
+            throw new AppException(ErrorCode.AUTHENTICATION_FAIL);
+        }
+
+        if (jwt.getJWTClaimsSet().getExpirationTime().before(new Date())) {
             throw new AppException(ErrorCode.AUTHENTICATION_FAIL);
         }
 
@@ -166,29 +180,30 @@ public class AuthenticationService {
         return jwt;
     }
 
-    String generateToken(User user) {
+    String generateToken(User user, boolean isRefresh) {
         JWSHeader header = new JWSHeader(JWSAlgorithm.HS256);
 
-        JWTClaimsSet claimsSet = new  JWTClaimsSet.Builder()
+        long expirationSeconds = isRefresh
+                ? REFRESH_TOKEN_EXPIRATION_TIME   // ví dụ: 7 ngày
+                : ASSERTION_EXPIRATION_TIME;       // ví dụ: 15 phút
+
+        JWTClaimsSet claimsSet = new JWTClaimsSet.Builder()
                 .subject(user.getUserName())
-//                .issuer("http://localhost:8080/storage")
                 .issuer("storage-service")
                 .issueTime(new Date())
                 .expirationTime(new Date(
-                        Instant.now().plus(ASSERTION_EXPIRATION_TIME, ChronoUnit.SECONDS).toEpochMilli()
+                        Instant.now().plus(expirationSeconds, ChronoUnit.SECONDS).toEpochMilli()
                 ))
                 .jwtID(UUID.randomUUID().toString())
                 .claim("scope", buildScope(user))
+                .claim("token_type", isRefresh ? "refresh" : "access") // ← thêm mới
                 .build();
 
-        Payload  payload = new Payload(claimsSet.toJSONObject());
-
+        Payload payload = new Payload(claimsSet.toJSONObject());
         JWSObject jwsObject = new JWSObject(header, payload);
 
         try {
-
             jwsObject.sign(new MACSigner(SIGNER_KEY.getBytes()));
-
             return jwsObject.serialize();
         } catch (JOSEException e) {
             throw new RuntimeException(e);

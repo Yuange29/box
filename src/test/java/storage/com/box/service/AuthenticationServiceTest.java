@@ -66,7 +66,7 @@ public class AuthenticationServiceTest {
 
         response = AuthenticationResponse.builder()
                 .status("success")
-                .token("token")
+                .accessToken("token")
                 .build();
 
         PasswordEncoder passwordEncoder = new BCryptPasswordEncoder(10);
@@ -98,7 +98,7 @@ public class AuthenticationServiceTest {
         var response = authenticationService.authenticate(request);
 
         assertNotNull(response);
-        assertNotNull(response.getToken());
+        assertNotNull(response.getAccessToken());
 
         verify(userRepository).findByUserName(request.getUserName());
     }
@@ -138,7 +138,7 @@ public class AuthenticationServiceTest {
 
         doReturn(signedJWT)
                 .when(authenticationService)
-                .verifyToken("validToken", false);
+                .verifyToken("validToken", "access");
 
         var response = authenticationService.introspect(introspectRequest);
 
@@ -153,7 +153,7 @@ public class AuthenticationServiceTest {
 
         doThrow(new ParseException("Invalid Token", 0))
                 .when(authenticationService)
-                .verifyToken("invalidToken", false);
+                .verifyToken("invalidToken", "access");
 
         var response = authenticationService.introspect(introspectRequest);
 
@@ -178,16 +178,16 @@ public class AuthenticationServiceTest {
 
         doReturn(signedJWT)
                 .when(authenticationService)
-                .verifyToken(refreshTokenRequest.getToken(), true);
+                .verifyToken(refreshTokenRequest.getToken(), "refresh");
 
         when(userRepository.findByUserName(request.getUserName()))
                 .thenReturn(Optional.of(user));
 
-        doReturn("newToken").when(authenticationService).generateToken(user);
+        doReturn("newToken").when(authenticationService).generateToken(user, true);
 
         var response = authenticationService.refreshToken(refreshTokenRequest);
 
-        assertThat(response.getToken()).isEqualTo("newToken");
+        assertThat(response.getAccessToken()).isEqualTo("newToken");
 
     }
 
@@ -209,7 +209,7 @@ public class AuthenticationServiceTest {
 
         doReturn(signedJWT)
                 .when(authenticationService)
-                .verifyToken(refreshTokenRequest.getToken(), true);
+                .verifyToken(refreshTokenRequest.getToken(), "refresh");
 
         when(userRepository.findByUserName(ArgumentMatchers.anyString()))
                 .thenReturn(Optional.empty());
@@ -239,7 +239,7 @@ public class AuthenticationServiceTest {
 
         doReturn(signedJWT)
                 .when(authenticationService)
-                .verifyToken("existToken", false);
+                .verifyToken("existToken", "access");
 
         authenticationService.logout(introspectRequest);
 
@@ -257,7 +257,7 @@ public class AuthenticationServiceTest {
 
         doThrow(new ParseException("invalid", 0))
                 .when(authenticationService)
-                .verifyToken("invalid-token", false);
+                .verifyToken("invalid-token", "access");
 
         assertThrows(ParseException.class,
                 () -> authenticationService.logout(request));
@@ -267,12 +267,12 @@ public class AuthenticationServiceTest {
 
     @Test
     void verifyToken_validRequest_success() throws Exception {
-        String token = authenticationService.generateToken(user);
+        String token = authenticationService.generateToken(user, false);
 
         when(invalidTokenRepository.existsById(anyString()))
                 .thenReturn(false);
 
-        SignedJWT jwt = authenticationService.verifyToken(token, false);
+        SignedJWT jwt = authenticationService.verifyToken(token, "access");
 
         assertNotNull(jwt);
         assertEquals("test user", jwt.getJWTClaimsSet().getSubject());
@@ -308,18 +308,18 @@ public class AuthenticationServiceTest {
                 .thenReturn(true);
 
         assertThrows(AppException.class,
-                () -> authenticationService.verifyToken(expiredToken, false));
+                () -> authenticationService.verifyToken(expiredToken, "access"));
     }
 
     @Test
     void verifyToken_invalidRequest_fail() {
-        String token = authenticationService.generateToken(user);
+        String token = authenticationService.generateToken(user, false);
 
         when(invalidTokenRepository.existsById(anyString()))
                 .thenReturn(true);
 
         var exception = assertThrows(AppException.class,() ->
-                authenticationService.verifyToken(token, false));
+                authenticationService.verifyToken(token, "access"));
 
         assertThat(exception.getMessage()).isEqualTo(ErrorCode.AUTHENTICATION_FAIL.getMessage());
 

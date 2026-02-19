@@ -23,7 +23,6 @@ public class RoleController {
 
     @PostMapping
     public ApiResponse<RoleResponse> createRole(@RequestBody RoleCreationRequest roleCreationRequest ) {
-        log.info("đang ở controller");
         return ApiResponse.<RoleResponse>builder()
                 .result(roleService.createRole(roleCreationRequest))
                 .build();
