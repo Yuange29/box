@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
@@ -40,7 +41,7 @@ import java.util.UUID;
 @Slf4j
 public class AuthenticationService {
 
-    final PasswordEncoder passwordEncoder;
+    final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder(10);
     final UserRepository userRepository;
     final InvalidTokenRepository invalidTokenRepository;
 
