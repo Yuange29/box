@@ -51,7 +51,6 @@ public class CategoryService {
 
         Optional<User> user = userRepository.findByUserName(username);
 
-
         Category category = Category.builder()
                 .categoryName(request.getCategoryName())
                 .categoryDescription(request.getCategoryDescription())

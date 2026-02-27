@@ -12,6 +12,7 @@ import java.util.Date;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class FeeCreationResponse {
 
+    String feeId;;
     String feeName;
     double feePrice;
     String feeDescription;
