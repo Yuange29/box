@@ -139,7 +139,7 @@ public class AuthenticationService {
             invalidTokenRepository.save(invalidToken);
 
         } catch (AppException e) {
-            // Token hết hạn hoặc không hợp lệ → coi như đã logout thành công
+            //
         }
     }
 

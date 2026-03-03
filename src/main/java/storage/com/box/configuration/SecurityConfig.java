@@ -71,6 +71,7 @@ public class SecurityConfig {
 
         config.setAllowCredentials(true);
         config.addAllowedOrigin("http://localhost:3000");
+        config.addAllowedOrigin("https://storage-taupe-kappa.vercel.app");
 
         config.addAllowedMethod("*");
         config.addAllowedHeader("*");
