@@ -16,9 +16,16 @@ public class Category {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(name = "category_id")
     String categoryId;
+
+    @Column(name = "category_name")
     String categoryName;
+
+    @Column(name = "category_description")
     String categoryDescription;
+
+    @Column(name = "user_id")
     String userId;
 
 }
