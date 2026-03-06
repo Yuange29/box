@@ -9,8 +9,10 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import storage.com.box.entity.Permission;
 import storage.com.box.entity.Role;
 import storage.com.box.entity.User;
+import storage.com.box.repository.PermissionRepository;
 import storage.com.box.repository.RoleRepository;
 import storage.com.box.repository.UserRepository;
 
@@ -27,16 +29,25 @@ public class ApplicationInitStart {
     @Bean
     @ConditionalOnProperty(prefix = "spring", name = "datasource.driver-class-name",
     havingValue = "com.mysql.cj.jdbc.Driver")
-    ApplicationRunner applicationRunner(UserRepository userRepository, RoleRepository roleRepository) {
+    ApplicationRunner applicationRunner(UserRepository userRepository,
+                                        RoleRepository roleRepository,
+                                        PermissionRepository permissionRepository) {
         return args -> {
 
             if (!userRepository.existsByUserName("#admin")) {
 
                 Role roleAdmin = roleRepository.findById("ADMIN")
-                        .orElseGet(() -> roleRepository.save(
-                                Role.builder().name("ADMIN").permissions(null).build()
-                        ));
+                        .orElseGet(() -> {
+                            // add permission
+//                            permissionRepository.save(Permission.builder().name("CREATE").description("create new data").build());
+//                            permissionRepository.save(Permission.builder().name("UPDATE").description("update new data").build());
+//                            permissionRepository.save(Permission.builder().name("DELETE").description("delete new data").build());
+//                            permissionRepository.save(Permission.builder().name("GET").description("create new data").build());
 
+
+
+                            return roleRepository.save(Role.builder().name("ADMIN").permissions(null).build());
+                                });
                 var roles = new HashSet<Role>();
                 roles.add(roleAdmin);
 

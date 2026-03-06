@@ -13,9 +13,9 @@ spring:
     name: storage-box
 
   datasource:
-    url: jdbc:postgresql://aws-1-ap-south-1.pooler.supabase.com:5432/postgres?prepareThreshold=0&sslmode=require
-    username: ${DB_USER:postgres.zpbivdhmykbgtaiwkwrg}
-    password: ${DB_PW:jLSgtwZU21aE1er0}
+    url: jdbc:postgresql://ep-misty-surf-a1zhcdcv-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
+    username: ${DB_USER:neondb_owner}
+    password: ${DB_PW:npg_EdZo9cpgtH3I}
     driver-class-name: org.postgresql.Driver
 
 
